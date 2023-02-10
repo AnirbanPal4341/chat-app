@@ -1,1 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Demo Chat</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <link
+      href="https://unpkg.com/vue-simple-notify/dist/vue-simple-notify.min.css"
+      rel="stylesheet"
+    />
+    <link href="/index.css" rel="stylesheet" />
+    <link
+      href="https://unpkg.com/vue-simple-notify/dist/vue-simple-notify.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <main id="v-app">
+      <section class="login" v-if="isAuthenticated === false">
+        <h1>Demo Chat Login</h1>
+        <form>
+            <p>Username : </p>
+            <input v-model="uid" type="text"/>
+            <p>Password : </p>
+            <input v-model="pass" type="text"/>
+            <br><br>
+            <button type="submit" @click.prevent="Login()">Login</button>
+        </form>
+        <p>
+            <ul>
+                <li v-for="msg of messages">
+                    <strong>{{ msg.sender }}:</strong> {{ msg.message }}
+                </li>
+            </ul>
+        </p>
+    </section>
+    <section class="chat" v-if="isAuthenticated === true">
+        <h1>Demo Chat</h1> 
+        <form>
+            <input v-model="text" type="text"/>
+            <button type="submit" @click.prevent="sendMessage()">Send</button>
+        </form>
+        <p>
+            <ul>
+                <li v-for="msg of messages">
+                    <strong>{{ msg.sender }}:</strong> {{ msg.message }}
+                </li>
+            </ul>
+        </p>
+    </section>
+    </main>
+    <!-- Vue -->
+    <script>
+      var app = new Vue({
+        el: '#v-app',
+        data: {
+          username: '',
+          text: '',
+          uid: '',
+          pass: '',
+          token: '',
+          messages: [],
+          socket: { chat: null },
+          room: 'general',
+          isAuthenticated: false,
+        },
+        methods: {
 
+          Login(){
+          let data = { username: this.uid , password: this.pass };
+          let options = {
+            method: 'POST',
+            headers: {
+                'Content-Type':
+                    'application/json;charset=utf-8'
+            },
+            body: JSON.stringify(data),
+          }
+          let fetchRes = fetch('http://localhost:3000/auth/', options );
+          fetchRes.then(response => response.json())
+          .then((data) => {
+            if(!data.token){
+              console.error('Credentials incorrect');
+              this.isAuthenticated = false;
+              this.uid='';
+              this.pass='';
+            }
+            else{
+              this.isAuthenticated = true;
+              this.token = data.token;
+              this.username = data.username;
+              console.log(data.msg);
+              if(this.isAuthenticated){
+                this.joinRoom();
+              } 
+            }
+            })
+          .catch((error) => {
+            this.isAuthenticated = false;
+            console.log(error);
+            console.error('Frontend : Credentials incorrect');
+          });
+          },
+
+          sendMessage() {
+          console.log('emmited :  ' + this.username + '  ' + this.text );
+          this.socket.chat.emit('msgToServer', {sender: this.username, message: this.text});
+          this.text = '';
+          },
+
+          joinRoom(){
+          this.socket.chat = io('http://localhost:3000/',{
+           transports: ["websocket"],
+           query : {
+            "auth" : this.token,
+           }
+           });
+
+          this.socket.chat.emit('joinRoom', this.room);
+          this.socket.chat.on('msgToClient', (msg) => {
+          console.log(msg);
+          this.messages.push(msg);
+          console.log("+ 1 msg !");
+          }); 
+          },
+        },
+
+        created() {    
+        },
+
+      });
+    </script>
+  </body>
+</html>
+
+
+
+<!-- 
+  this.socket.chat = io('http://localhost:3000/chat',{
+  transports: ["websocket"],
+  transportOptions: {
+    polling: {
+      extraHeaders: {
+        Authorization: `Bearer ${this.token}`
+        }
+      }
+     }
+  }); 
+-->
